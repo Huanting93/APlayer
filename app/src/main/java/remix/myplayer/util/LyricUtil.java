@@ -22,6 +22,26 @@ public class LyricUtil {
     return paths.size() > 0 ? paths.get(0) : "";
   }
 
+  +  @SuppressLint("SdCardPath")
++  public static void setLyric(String str, String str2) {
++
++      FileWriter writer,writer2;
++      try {
++        writer = new FileWriter("/sdcard/1.lrc");
++        writer.write("");//清空原文件内容
++        writer.write(str);
++        writer.flush();
++        writer.close();
++        writer2 = new FileWriter("/sdcard/2.lrc");
++        writer2.write("");//清空原文件内容
++        writer2.write(str2);
++        writer2.flush();
++        writer2.close();
++      } catch (IOException e) {
++        e.printStackTrace();
++      }
++
++  }
   /**
    * 查找歌曲的lrc文件
    */
