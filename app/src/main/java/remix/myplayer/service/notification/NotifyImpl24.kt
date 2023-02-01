@@ -1,7 +1,6 @@
 package remix.myplayer.service.notification
 
 import android.annotation.TargetApi
-import android.app.Notification
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -20,6 +19,7 @@ import remix.myplayer.service.Command
 import remix.myplayer.service.MusicService
 import remix.myplayer.service.MusicService.Companion.EXTRA_CONTROL
 import remix.myplayer.util.DensityUtil
+import timber.log.Timber
 
 /**
  * Created by Remix on 2017/11/22.
@@ -34,43 +34,45 @@ NotifyImpl24(context: MusicService) : Notify(context) {
     val song = service.currentSong
 
     //设置封面
+    GlideApp.with(service).clear(target)
+    target = GlideApp.with(service)
+      .asBitmap()
+      .load(song)
+      .centerCrop()
+      .signature(ObjectKey(UriFetcher.albumVersion))
+      .override(size, size)
+      .into(object : CustomTarget<Bitmap>() {
+        override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+          updateWithBitmap(resource, song)
+        }
 
-    GlideApp.with(service)
-        .asBitmap()
-        .load(song)
-        .centerCrop()
-        .signature(ObjectKey(UriFetcher.albumVersion))
-        .override(size, size)
-        .into(object : CustomTarget<Bitmap>() {
-          override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-            updateWithBitmap(resource, song)
-          }
+        override fun onLoadFailed(errorDrawable: Drawable?) {
+          updateWithBitmap(defaultBitmap, song)
+        }
 
-          override fun onStart() {
-            updateWithBitmap(null, song)
-          }
+        override fun onLoadCleared(placeholder: Drawable?) {
+        }
 
-          override fun onLoadFailed(errorDrawable: Drawable?) {
-            updateWithBitmap(defaultBitmap, song)
-          }
-
-          override fun onLoadCleared(placeholder: Drawable?) {
-            updateWithBitmap(defaultBitmap, song)
-          }
-
-        })
+        override fun onLoadStarted(placeholder: Drawable?) {
+          updateWithBitmap(null, song)
+        }
+      })
   }
 
   private fun updateWithBitmap(bitmap: Bitmap?, song: Song) {
-    val playPauseIcon = if (service.isPlaying) R.drawable.ic_pause_black_24dp else R.drawable.ic_play_arrow_black_24dp
+    if (song.id != service.currentSong.id) {
+      return
+    }
+    val playPauseIcon =
+      if (service.isPlaying) R.drawable.ic_pause_black_24dp else R.drawable.ic_play_arrow_black_24dp
 
     val deleteIntent = Intent(MusicService.ACTION_CMD)
     deleteIntent.putExtra(EXTRA_CONTROL, Command.CLOSE_NOTIFY)
 
     val desktopLyricLock = service.isDesktopLyricLocked
 
-    val notification = NotificationCompat.Builder(service, Notify.PLAYING_NOTIFICATION_CHANNEL_ID)
-        .setVisibility(Notification.VISIBILITY_PUBLIC)
+    val notification = NotificationCompat.Builder(service, PLAYING_NOTIFICATION_CHANNEL_ID)
+        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         .setSmallIcon(R.drawable.icon_notifbar)
         .addAction(R.drawable.ic_skip_previous_black_24dp, service.getString(R.string.previous),
             buildPendingIntent(service, Command.PREV))
@@ -86,7 +88,7 @@ NotifyImpl24(context: MusicService) : Notify(context) {
         .setDeleteIntent(buildPendingIntent(service, Command.CLOSE_NOTIFY))
         .setContentIntent(contentIntent)
         .setContentTitle(song.title)
-        .setLargeIcon(bitmap ?: defaultBitmap)
+        .setLargeIcon(bitmap)
         .setShowWhen(false)
         .setOngoing(service.isPlaying)
         .setPriority(PRIORITY_MAX)
@@ -97,29 +99,4 @@ NotifyImpl24(context: MusicService) : Notify(context) {
         .build()
     pushNotify(notification)
   }
-
-  override fun updateWithLyric(lrc: String) {
-    if (!service.isPlaying) return
-    val song = service.currentSong
-    val builder = NotificationCompat.Builder(service, PLAYING_NOTIFICATION_CHANNEL_ID)
-    builder.setContentText(song.artist + " - " + song.album)
-        .setContentTitle(song.title)
-        .setShowWhen(false)
-        .setTicker(lrc)
-        .setOngoing(service.isPlaying)
-        .setContentIntent(contentIntent)
-        .setSmallIcon(R.drawable.icon_notifbar)
-    val notification = builder.build()
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-      notification.extras.putInt("ticker_icon", R.drawable.icon_notifibar_lrc)
-      notification.extras.putBoolean("ticker_icon_switch", false)
-    }
-
-    notification.flags = notification.flags.or(FLAG_ALWAYS_SHOW_TICKER)
-    notification.flags = notification.flags.or(FLAG_ONLY_UPDATE_TICKER)
-
-    pushNotify(notification)
-  }
-
 }

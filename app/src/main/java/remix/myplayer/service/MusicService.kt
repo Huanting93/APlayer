@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.*
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.media.AudioAttributes
 import android.media.AudioManager
@@ -45,6 +46,7 @@ import remix.myplayer.lyric.LyricFetcher
 import remix.myplayer.lyric.LyricFetcher.Companion.LYRIC_FIND_INTERVAL
 import remix.myplayer.lyric.bean.LyricRowWrapper
 import remix.myplayer.misc.floatpermission.FloatWindowManager
+import remix.myplayer.misc.getPendingIntentFlag
 import remix.myplayer.misc.log.LogObserver
 import remix.myplayer.misc.observer.MediaStoreObserver
 import remix.myplayer.misc.receiver.ExitReceiver
@@ -56,7 +58,7 @@ import remix.myplayer.misc.tryLaunch
 import remix.myplayer.service.notification.Notify
 import remix.myplayer.service.notification.NotifyImpl
 import remix.myplayer.service.notification.NotifyImpl24
-import remix.myplayer.theme.Theme
+import remix.myplayer.theme.ThemeStore
 import remix.myplayer.ui.activity.LockScreenActivity
 import remix.myplayer.ui.activity.base.BaseMusicActivity
 import remix.myplayer.ui.activity.base.BaseMusicActivity.Companion.EXTRA_PERMISSION
@@ -73,7 +75,6 @@ import remix.myplayer.util.Util.unregisterLocalReceiver
 import timber.log.Timber
 import java.lang.ref.WeakReference
 import java.util.*
-import kotlin.collections.ArrayList
 
 /**
  * Created by Remix on 2015/12/1.
@@ -84,6 +85,7 @@ import kotlin.collections.ArrayList
  */
 @SuppressLint("CheckResult")
 class MusicService : BaseService(), Playback, MusicEventCallback,
+    MediaPlayer.OnErrorListener, MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener,
     SharedPreferences.OnSharedPreferenceChangeListener, CoroutineScope by MainScope() {
   // 播放队列
   private val playQueue = PlayQueue(this)
@@ -437,7 +439,7 @@ class MusicService : BaseService(), Playback, MusicEventCallback,
     stop = false
 
     tryLaunch {
-      hasPermission = PermissionUtil.hasReadAndWriteExternalStorage()
+      hasPermission = PermissionUtil.hasNecessaryPermission()
       withContext(Dispatchers.IO) {
         load()
       }
@@ -578,7 +580,7 @@ class MusicService : BaseService(), Playback, MusicEventCallback,
     val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON)
     mediaButtonIntent.component = mediaButtonReceiverComponentName
 
-    val pendingIntent = PendingIntent.getBroadcast(applicationContext, 0, mediaButtonIntent, 0)
+    val pendingIntent = PendingIntent.getBroadcast(applicationContext, 0, mediaButtonIntent, getPendingIntentFlag())
 
     mediaSession = MediaSessionCompat(applicationContext, "APlayer", mediaButtonReceiverComponentName, pendingIntent)
     mediaSession.setCallback(object : MediaSessionCompat.Callback() {
@@ -633,60 +635,60 @@ class MusicService : BaseService(), Playback, MusicEventCallback,
       mediaPlayer.setAudioStreamType(audioAttributes.legacyStreamType)
     }
     mediaPlayer.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK)
-
-    mediaPlayer.setOnCompletionListener { mp ->
-      if (pendingClose) {
-        Timber.v("发送Exit广播")
-        sendBroadcast(Intent(ACTION_EXIT)
-            .setComponent(ComponentName(this@MusicService, ExitReceiver::class.java)))
-        return@setOnCompletionListener
-      }
-      if (playModel == MODE_REPEAT) {
-        prepare(playQueue.song)
-      } else {
-        playNextOrPrev(true)
-      }
-      operation = Command.NEXT
-      acquireWakeLock()
-    }
-    mediaPlayer.setOnPreparedListener { mp ->
-      Timber.v("准备完成:%s", firstPrepared)
-
-      if (firstPrepared) {
-        firstPrepared = false
-        if (lastProgress > 0) {
-          mediaPlayer.seekTo(lastProgress)
-        }
-        //自动播放
-        if (SPUtil.getValue(this, SETTING_KEY.NAME, SETTING_KEY.AUTO_PLAY, NEVER) != OPEN_SOFTWARE) {
-          return@setOnPreparedListener
-        }
-      }
-
-      Timber.v("开始播放")
-      //记录播放历史
-      updatePlayHistory()
-      //开始播放
-      play(false)
-    }
-
-    mediaPlayer.setOnErrorListener { mp, what, extra ->
-      try {
-        prepared = false
-        mediaPlayer.release()
-        setUpPlayer()
-        ToastUtil.show(service, R.string.mediaplayer_error, what, extra)
-        return@setOnErrorListener true
-      } catch (ignored: Exception) {
-
-      }
-      false
-    }
+    mediaPlayer.setOnCompletionListener(this)
+    mediaPlayer.setOnPreparedListener(this)
+    mediaPlayer.setOnErrorListener(this)
 
     EQHelper.init(this, mediaPlayer.audioSessionId)
     EQHelper.open(this, mediaPlayer.audioSessionId)
   }
 
+  override fun onCompletion(mp: MediaPlayer?) {
+    if (pendingClose) {
+      Timber.v("发送Exit广播")
+      sendBroadcast(Intent(ACTION_EXIT)
+          .setComponent(ComponentName(this@MusicService, ExitReceiver::class.java)))
+      return
+    }
+    if (playModel == MODE_REPEAT) {
+      prepare(playQueue.song)
+    } else {
+      playNextOrPrev(true)
+    }
+    operation = Command.NEXT
+    acquireWakeLock()
+  }
+
+  override fun onPrepared(mp: MediaPlayer?) {
+    Timber.v("准备完成:%s", firstPrepared)
+
+    if (firstPrepared) {
+      firstPrepared = false
+      if (lastProgress > 0) {
+        mediaPlayer.seekTo(lastProgress)
+      }
+      //自动播放
+      if (SPUtil.getValue(this, SETTING_KEY.NAME, SETTING_KEY.AUTO_PLAY, NEVER) != OPEN_SOFTWARE) {
+        return
+      }
+    }
+
+    Timber.v("开始播放")
+    //记录播放历史
+    updatePlayHistory()
+    //开始播放
+    play(false)
+  }
+
+  override fun onError(mp: MediaPlayer?, what: Int, extra: Int): Boolean {
+    Timber.e("onError, what: $what extra: $extra")
+    ToastUtil.show(service, R.string.mediaplayer_error, what, extra)
+    prepared = false
+    mediaPlayer.release()
+    setUpPlayer()
+    playNext()
+    return true
+  }
 
   /**
    * 更新播放历史
@@ -1370,13 +1372,14 @@ class MusicService : BaseService(), Playback, MusicEventCallback,
       builder.putLong(MediaMetadataCompat.METADATA_KEY_NUM_TRACKS, playQueue.size().toLong())
     }
 
-    if (updatePlayStateOnly(control)) {
-      mediaSession.setMetadata(builder.build())
-    } else {
+    mediaSession.setMetadata(builder.build())
+
+    if (!updatePlayStateOnly(control)) {
+      val placeholder = if (ThemeStore.isLightTheme) R.drawable.album_empty_bg_day else R.drawable.album_empty_bg_night
       GlideApp.with(this)
           .asBitmap()
           .load(currentSong)
-          .placeholder(Theme.resolveDrawable(this, R.attr.default_album))
+          .error(placeholder)
           .centerCrop()
           .override(DensityUtil.dip2px(160f), DensityUtil.dip2px(160f))
           .into(object : CustomTarget<Bitmap>() {
@@ -1385,8 +1388,7 @@ class MusicService : BaseService(), Playback, MusicEventCallback,
             }
 
             override fun onLoadFailed(errorDrawable: Drawable?) {
-              super.onLoadFailed(errorDrawable)
-              setMediaSessionData(null)
+              setMediaSessionData((errorDrawable as? BitmapDrawable)?.bitmap)
             }
 
             private fun setMediaSessionData(result: Bitmap?) {
@@ -1400,7 +1402,6 @@ class MusicService : BaseService(), Playback, MusicEventCallback,
             }
           })
     }
-
     updatePlaybackState()
   }
 

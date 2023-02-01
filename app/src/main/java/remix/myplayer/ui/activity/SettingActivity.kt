@@ -361,7 +361,7 @@ class SettingActivity : ToolbarActivity(), ColorChooserDialog.ColorCallback,
     object : Thread() {
       override fun run() {
         cacheSize = 0
-        cacheSize += Util.getFolderSize(externalCacheDir)
+//        cacheSize += Util.getFolderSize(externalCacheDir)
         cacheSize += Util.getFolderSize(cacheDir)
         handler.sendEmptyMessage(CACHE_SIZE)
       }
@@ -661,10 +661,11 @@ class SettingActivity : ToolbarActivity(), ColorChooserDialog.ColorCallback,
     val zhSimple = getString(R.string.zh_simple)
     val zhTraditional = getString(R.string.zh_traditional)
     val english = getString(R.string.english)
+    val japanese = getString(R.string.japanese)
     val auto = getString(R.string.auto)
 
     getBaseDialog(this)
-        .items(auto, zhSimple, zhTraditional, english)
+        .items(auto, zhSimple, zhTraditional, english, japanese)
         .itemsCallbackSingleChoice(
             SPUtil.getValue(
                 this, SETTING_KEY.NAME, SETTING_KEY.LANGUAGE, AUTO
@@ -1004,7 +1005,7 @@ class SettingActivity : ToolbarActivity(), ColorChooserDialog.ColorCallback,
                 //清除歌词，封面等缓存
                 //清除配置文件、数据库等缓存
                 Util.deleteFilesByDirectory(cacheDir)
-                Util.deleteFilesByDirectory(externalCacheDir)
+//                Util.deleteFilesByDirectory(externalCacheDir)
                 DiskCache.init(this@SettingActivity, "lyric")
                 //清除glide缓存
                 GlideApp.get(this@SettingActivity).clearDiskCache()
@@ -1096,7 +1097,7 @@ class SettingActivity : ToolbarActivity(), ColorChooserDialog.ColorCallback,
     }
     val selected = ArrayList<Int>()
     for (temp in oldLibraries) {
-      selected.add(temp.mOrder)
+      selected.add(temp.order)
     }
 
     val allLibraryStrings = getAllLibraryString(this)

@@ -4,7 +4,6 @@ import android.app.Notification
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
-import android.os.Build
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -93,15 +92,18 @@ class NotifyImpl(context: MusicService) : Notify(context) {
 
     //设置封面
     val size = DensityUtil.dip2px(service, 128f)
+    pushNotify(notification)
 
-    GlideApp.with(service)
-        .asBitmap()
-        .load(song)
-        .override(size, size)
-        .centerCrop()
-        .signature(ObjectKey(UriFetcher.albumVersion))
-        .into(object : CustomTarget<Bitmap>() {
-          override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+    GlideApp.with(service).clear(target)
+    target = GlideApp.with(service)
+      .asBitmap()
+      .load(song)
+      .override(size, size)
+      .centerCrop()
+      .signature(ObjectKey(UriFetcher.albumVersion))
+      .into(object : CustomTarget<Bitmap>() {
+        override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+          if (song.id == service.currentSong.id) {
             if (!resource.isRecycled) {
               remoteBigView.setImageViewBitmap(R.id.notify_image, resource)
               remoteView.setImageViewBitmap(R.id.notify_image, resource)
@@ -112,26 +114,27 @@ class NotifyImpl(context: MusicService) : Notify(context) {
 
             pushNotify(notification)
           }
+        }
 
-          override fun onLoadCleared(placeholder: Drawable?) {
+        override fun onLoadCleared(placeholder: Drawable?) {
+        }
+
+        override fun onLoadFailed(errorDrawable: Drawable?) {
+          if (song.id == service.currentSong.id) {
             remoteBigView.setImageViewResource(R.id.notify_image, R.drawable.album_empty_bg_day)
             remoteView.setImageViewResource(R.id.notify_image, R.drawable.album_empty_bg_day)
             pushNotify(notification)
           }
+        }
 
-          override fun onLoadFailed(errorDrawable: Drawable?) {
+        override fun onLoadStarted(placeholder: Drawable?) {
+          if (song.id == service.currentSong.id) {
             remoteBigView.setImageViewResource(R.id.notify_image, R.drawable.album_empty_bg_day)
             remoteView.setImageViewResource(R.id.notify_image, R.drawable.album_empty_bg_day)
             pushNotify(notification)
           }
-
-          override fun onLoadStarted(placeholder: Drawable?) {
-            remoteBigView.setImageViewResource(R.id.notify_image, R.drawable.album_empty_bg_day)
-            remoteView.setImageViewResource(R.id.notify_image, R.drawable.album_empty_bg_day)
-            pushNotify(notification)
-          }
-
-        })
+        }
+      })
   }
 
   private fun buildNotification(context: Context, remoteView: RemoteViews, remoteBigView: RemoteViews): Notification {
@@ -174,30 +177,6 @@ class NotifyImpl(context: MusicService) : Notify(context) {
         if (service.isDesktopLyricLocked) Command.UNLOCK_DESKTOP_LYRIC else Command.TOGGLE_DESKTOP_LYRIC)
     remoteBigView.setOnClickPendingIntent(R.id.notify_lyric, lyricIntent)
     remoteView.setOnClickPendingIntent(R.id.notify_lyric, lyricIntent)
-  }
-
-  override fun updateWithLyric(lrc: String) {
-    if (!service.isPlaying) return
-    val song = service.currentSong
-    val builder = NotificationCompat.Builder(service, PLAYING_NOTIFICATION_CHANNEL_ID)
-    builder.setContentText(song.title)
-        .setContentTitle(song.title)
-        .setShowWhen(false)
-        .setTicker(lrc)
-        .setOngoing(service.isPlaying)
-        .setContentIntent(contentIntent)
-        .setSmallIcon(R.drawable.icon_notifbar)
-    val notification = builder.build()
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-      notification.extras.putInt("ticker_icon", R.drawable.icon_notifibar_lrc)
-      notification.extras.putBoolean("ticker_icon_switch", false)
-    }
-
-    notification.flags = notification.flags.or(FLAG_ALWAYS_SHOW_TICKER)
-    notification.flags = notification.flags.or(FLAG_ONLY_UPDATE_TICKER)
-
-    pushNotify(notification)
   }
 
 //  private fun tintBitmap(resId: Int, color: Int?): Bitmap {

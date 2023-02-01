@@ -86,21 +86,28 @@ public class RomUtils {
   }
 
   public static boolean checkIsMeizuRom() {
-    //return Build.MANUFACTURER.contains("Meizu");
-    String meizuFlymeOSFlag = getSystemProperty("ro.build.display.id");
-    if (TextUtils.isEmpty(meizuFlymeOSFlag)) {
-      return false;
-    } else if (meizuFlymeOSFlag.contains("flyme") || meizuFlymeOSFlag.toLowerCase()
-        .contains("flyme")) {
-      return true;
-    } else {
-      return false;
-    }
+    return Build.DISPLAY.toLowerCase().contains("flyme");
   }
 
   public static boolean checkIs360Rom() {
     //fix issue https://github.com/zhaozepeng/FloatWindowPermission/issues/9
     return Build.MANUFACTURER.contains("QiKU")
         || Build.MANUFACTURER.contains("360");
+  }
+
+  public static boolean checkIsexTHmUIRom() {
+    String exTHmUIFlag = getSystemProperty("ro.exthm.device");
+    if (TextUtils.isEmpty(exTHmUIFlag))
+      return false;
+    else
+      return true;
+  }
+
+  public static boolean checkIsbaolong24Rom() {
+    String baolong24Flag = getSystemProperty("org.baolong24.device");
+    if (TextUtils.isEmpty(baolong24Flag))
+      return false;
+    else
+      return true;
   }
 }

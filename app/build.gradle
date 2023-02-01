@@ -18,16 +18,16 @@ repositories {
 }
 
 android {
-    compileSdkVersion 30
+    compileSdkVersion 33
 //    ndkVersion "23.0.7599858"
 
     defaultConfig {
         applicationId "remix.myplayer"
         minSdkVersion 19
-        targetSdkVersion 30
+        targetSdkVersion 33
 
-        versionCode 15790
-        versionName "1.5.7.9"
+        versionCode 16030
+        versionName "1.6.0.3"
 
         flavorDimensions "default"
         vectorDrawables.useSupportLibrary = true
@@ -177,13 +177,13 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
 
     //leakCanary
-    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.0-beta-2'
+    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.10'
 
     //bugly
     implementation 'com.tencent.bugly:crashreport:3.3.3'
 
     //gp
-    implementation 'com.anjlab.android.iab.v3:library:1.1.0'
+    implementation 'com.anjlab.android.iab.v3:library:2.0.3'
 
     //room
     implementation 'androidx.room:room-runtime:2.3.0'

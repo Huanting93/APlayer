@@ -14,16 +14,21 @@ import remix.myplayer.App
 import remix.myplayer.BuildConfig
 
 object PermissionUtil {
-  private fun has(permission: String): Boolean {
-    return ContextCompat.checkSelfPermission(
+  private fun has(vararg permissions: String): Boolean {
+    return permissions.all {
+      ContextCompat.checkSelfPermission(
         App.context,
-        permission
-    ) == PackageManager.PERMISSION_GRANTED
+        it
+      ) == PackageManager.PERMISSION_GRANTED
+    }
   }
 
-  fun hasReadAndWriteExternalStorage(): Boolean {
-    return has(Manifest.permission.READ_EXTERNAL_STORAGE) &&
-           has(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+  fun hasNecessaryPermission(): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      has(Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_MEDIA_IMAGES)
+    } else {
+      has(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
   }
 
   @RequiresApi(Build.VERSION_CODES.R)

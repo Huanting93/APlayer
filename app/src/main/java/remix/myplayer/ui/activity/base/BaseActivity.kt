@@ -14,7 +14,6 @@ import remix.myplayer.BuildConfig
 import remix.myplayer.R
 import remix.myplayer.bean.mp3.Song
 import remix.myplayer.helper.LanguageHelper.setLocal
-import remix.myplayer.misc.manager.ActivityManager
 import remix.myplayer.service.MusicService
 import remix.myplayer.theme.Theme
 import remix.myplayer.theme.ThemeStore.navigationBarColor
@@ -52,7 +51,7 @@ open class BaseActivity : AppCompatActivity() {
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
-    hasPermission = PermissionUtil.hasReadAndWriteExternalStorage()
+    hasPermission = PermissionUtil.hasNecessaryPermission()
     //严格模式
     if (BuildConfig.DEBUG) {
 //      StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
@@ -76,8 +75,6 @@ open class BaseActivity : AppCompatActivity() {
 //    } else{
 //      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 //    }
-    //将该activity添加到ActivityManager,用于退出程序时关闭
-    ActivityManager.AddActivity(this)
     setNavigationBarColor()
   }
 
@@ -118,12 +115,11 @@ open class BaseActivity : AppCompatActivity() {
 
   override fun onDestroy() {
     super.onDestroy()
-    ActivityManager.RemoveActivity(this)
     isDestroyed = true
   }
 
   override fun isDestroyed(): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) super.isDestroyed() else isDestroyed
+    return super.isDestroyed()
   }
 
   @SuppressLint("CheckResult")
@@ -131,7 +127,7 @@ open class BaseActivity : AppCompatActivity() {
     super.onResume()
     isForeground = true
     RxPermissions(this)
-        .request(*EXTERNAL_STORAGE_PERMISSIONS)
+        .request(*NECESSARY_PERMISSIONS)
         .subscribe { has: Boolean ->
           if (has != hasPermission) {
             val intent = Intent(MusicService.PERMISSION_CHANGE)
@@ -176,7 +172,13 @@ open class BaseActivity : AppCompatActivity() {
   }
 
   companion object {
-    val EXTERNAL_STORAGE_PERMISSIONS = arrayOf(
-        Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    val NECESSARY_PERMISSIONS =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_MEDIA_IMAGES)
+      } else if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+      } else {
+        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+      }
   }
 }
